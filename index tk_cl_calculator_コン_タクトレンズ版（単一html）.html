@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TK CL Calculator（コンタクトレンズ版）</title>
+  <style>
+    :root{--bg:#0b0c0f;--card:#14161b;--ink:#e8edf3;--muted:#a8b3c3;--accent:#7cc4ff;--border:#2a2f3a}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,Apple Color Emoji,Segoe UI Emoji;font-size:16px}
+    .wrap{max-width:1200px;margin:0 auto;padding:20px}
+    h1{margin:0 0 12px;font-size:clamp(20px,3.5vw,32px)}
+    .card{background:var(--card);border:1px solid #242836;border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.3);margin-bottom:20px}
+    label{display:block;font-size:13px;color:var(--muted);margin:6px 0}
+    input,select,button{width:100%;box-sizing:border-box}
+    input,select{background:#0f1116;color:var(--ink);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:16px}
+    button{cursor:pointer;border:none;background:linear-gradient(135deg,#3fb7ff,#7cc4ff);color:#00151f;font-weight:700;padding:12px 14px;border-radius:12px;font-size:15px}
+    .out{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0f1116;border:1px dashed var(--border);border-radius:12px;padding:12px;white-space:pre-wrap;margin-top:12px}
+    .row-2col{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+    .eye{background:#1b1d24;border:1px solid var(--border);border-radius:12px;padding:12px}
+    .eye h3{margin:0 0 8px;color:var(--accent);font-size:15px;text-align:center}
+    .fields{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+    .muted{color:var(--muted);font-size:12px}
+    .radio{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .error{border-color:#ff6b6b !important; box-shadow:0 0 0 2px rgba(255,107,107,.2) inset}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>TK CL Calculator（コンタクトレンズ用）</h1>
+
+    <div class="card">
+      <div class="row-2col">
+        <div class="eye">
+          <h3>右眼（R）</h3>
+          <div class="fields">
+            <div><label>S (D)</label><input id="rS" type="number" step="0.25" inputmode="decimal" enterkeyhint="done"></div>
+            <div><label>C (D) <span class="muted">−表記</span></label><input id="rC" type="number" step="0.25" inputmode="decimal" enterkeyhint="done"></div>
+            <div><label>AX (°)</label><input id="rAx" type="number" step="1" inputmode="numeric" pattern="[0-9]*" enterkeyhint="next"></div>
+          </div>
+          <div id="outR" class="out"></div>
+        </div>
+        <div class="eye">
+          <h3>左眼（L）</h3>
+          <div class="fields">
+            <div><label>S (D)</label><input id="lS" type="number" step="0.25" inputmode="decimal" enterkeyhint="done"></div>
+            <div><label>C (D) <span class="muted">−表記</span></label><input id="lC" type="number" step="0.25" inputmode="decimal" enterkeyhint="done"></div>
+            <div><label>AX (°)</label><input id="lAx" type="number" step="1" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done"></div>
+          </div>
+          <div id="outL" class="out"></div>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div><label>角膜曲率 平均K (mm)</label><input id="kMean" type="number" step="0.01" inputmode="decimal" enterkeyhint="done"></div>
+      </div>
+
+      <div class="row2">
+        <div class="radio">
+          <label><input type="radio" name="mode" value="sv" checked> 単焦点（通常）</label>
+          <label><input type="radio" name="mode" value="mf"> 遠近両用（多焦点）</label>
+          <label><input type="radio" name="mode" value="mono"> モノビジョン</label>
+        </div>
+        <div>
+          <label class="muted"><input type="checkbox" id="applyHalf"> トーリック時に円柱/2を球面に反映</label>
+        </div>
+      </div>
+
+      <!-- 遠近両用 用オプション（優位眼 & 年齢） -->
+      <div class="row2" id="mfOptions" style="display:none">
+        <div>
+          <label>優位眼（Dominant Eye）</label>
+          <div class="radio">
+            <label><input type="radio" name="dom" value="none" checked> なし/未判定</label>
+            <label><input type="radio" name="dom" value="R"> 右（R）</label>
+            <label><input type="radio" name="dom" value="L"> 左（L）</label>
+          </div>
+        </div>
+        <div id="ageWrap" style="display:none">
+          <label>年齢（必須）</label>
+          <input id="age" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" disabled>
+          <div id="ageHint" class="muted" style="display:none;color:#ffb3b3">遠近両用を選択したら年齢の入力が必須です。</div>
+        </div>
+      </div>
+
+      <!-- モノビジョン 用オプション -->
+      <div class="row2" id="monoOptions" style="display:none">
+        <div>
+          <label>優位眼（Dominant Eye）</label>
+          <div class="radio">
+            <label><input type="radio" name="domMono" value="R" checked> 右（R）=遠用</label>
+            <label><input type="radio" name="domMono" value="L"> 左（L）=遠用</label>
+          </div>
+        </div>
+        <div>
+          <label>近用オフセット（固定 +0.50D）</label>
+          <div class="muted">非優位眼に <span id="monoAddPreview">+0.50D</span> を加算して近用設定します。</div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap">
+        <button id="btnCalc" type="button" onclick="calcAll()">計算する</button>
+        <button id="btnReset" type="button" onclick="resetAll()">クリア</button>
+      </div>
+
+      <div id="runtimeError" class="out" style="display:none;border-color:#ff6b6b;color:#ffdede"></div>
+      <div id="outFit" class="out"></div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ===== ユーティリティ =====
+  function byId(id){ return document.getElementById(id); }
+  function val(id){ var el=byId(id); return el? String(el.value).trim() : ''; }
+  function read(id){ var v=val(id); return v===''? NaN : Number(v); }
+  function f2raw(x){ if(!isFinite(x)) return NaN; return Number(x.toFixed(2)); }
+  function f2s(x){ return isFinite(x)? ((x>=0?'+':'')+f2raw(x).toFixed(2)) : '—'; }
+  function normAxis(axis){ var a=Number(axis); if(!isFinite(a)) return 180; var n=((a%180)+180)%180; return n===0?180:Math.round(n); }
+  function inRange(v,a,b){ var lo=Math.min(a,b), hi=Math.max(a,b); return v>=lo && v<=hi; }
+
+  // ===== 球面換算 =====
+  function sphereFromTable(S){
+    if(!isFinite(S)) return 0;
+    var adj=0;
+    if(S<=-0.25){
+      if(S>=-4.25) adj=0.00; else if(S>=-6.00) adj=+0.25; else if(S>=-8.50) adj=+0.50;
+      else if(S>=-11.00) adj=+1.00; else if(S>=-13.00) adj=+1.25; else if(S>=-14.50) adj=+1.50; else adj=+2.00;
+    } else if(S>=+0.25){
+      if(S<=+3.50) adj=0.00; else if(S<=+5.00) adj=+0.25; else if(S<=+6.50) adj=+0.50;
+      else if(S<=+8.00) adj=+0.75; else if(S<=+9.50) adj=+1.00; else adj=+1.25; adj-=0.50; // 遠視はさらに-0.50
+    }
+    return S+adj;
+  }
+
+  // ===== トーリック =====
+  function toricCriteria(C,Ax){ var c=Math.abs(Number(C)); var a=Number(Ax); a=((a%180)+180)%180; if(((a>=125&&a<=180)||(a>=0&&a<=55)) && c>=1.25) return true; if((a>=60&&a<=120) && c>=1.00) return true; return false; }
+  function toricSnap(C,Ax){ var a=Number(Ax); a=((a%180)+180)%180; var c=Number(C);
+    if((a>=125&&a<=180)||(a>=0&&a<=55)){
+      if(inRange(c,-1.50,-1.25)) return -0.75;
+      if(inRange(c,-2.00,-1.75)) return -1.25;
+      if(inRange(c,-2.50,-2.25)) return -1.75;
+      if(c<=-2.75) return -2.25;
+    }
+    if(a>=60&&a<=120){
+      if(inRange(c,-1.25,-1.00)) return -0.75;
+      if(inRange(c,-1.75,-1.50)) return -1.25;
+      if(inRange(c,-2.25,-2.00)) return -1.75;
+      if(c<=-2.50) return -2.25;
+    }
+    return f2raw(c);
+  }
+
+  // ===== BC =====
+  function suggestBC(k){ var km=Number(k); if(!isFinite(km)) return '—（平均Kを入力）'; return (km+0.80).toFixed(2)+' 〜 '+(km+1.20).toFixed(2)+' mm'; }
+
+  // ===== 多焦点 ADD =====
+  function computeMfAdds(age, dom){
+    var a=Number(age);
+    if(!isFinite(a) || a<40) return {r:null,l:null,rLbl:'',lLbl:'',note:''};
+    function lvl(v){ return v===1.25?'LOW':(v===1.75?'MID':(v===2.25?'HIGH':'')); }
+    if(a>=40 && a<=45){ return {r:1.25,l:1.25,rLbl:'LOW',lLbl:'LOW',note:''}; }
+    if(a>=46 && a<=50){ return dom==='L'?{r:1.75,l:1.25,rLbl:'MID',lLbl:'LOW'}:{r:1.25,l:1.75,rLbl:'LOW',lLbl:'MID'}; }
+    if(a>=51 && a<=55){ return {r:1.75,l:1.75,rLbl:'MID',lLbl:'MID',note:''}; }
+    if(a>=56){ return dom==='L'?{r:2.25,l:1.75,rLbl:'HIGH',lLbl:'MID'}:{r:1.75,l:2.25,rLbl:'MID',lLbl:'HIGH'}; }
+    return {r:null,l:null,rLbl:'',lLbl:'',note:''};
+  }
+
+  // ===== 片眼計算 =====
+  function eyeCompute(S,C,Ax,applyHalf){
+    var sphere=sphereFromTable(S); var C_out=0, toric=false;
+    if(toricCriteria(C,Ax)){
+      toric=true; C_out=toricSnap(C,Ax); if(applyHalf) sphere = sphere - C_out/2;
+    }
+    return {sphere:f2raw(sphere), cyl:C_out, ax:normAxis(Ax), toric:toric};
+  }
+
+  // 推定CLテキスト（warnはBCの次の段落に出す）
+  function formatCL(o, addLabel, bcLabel, warn){
+    var lines = [];
+    lines.push('推定CL: ' + f2s(o.sphere) + ' / ' + f2s(o.cyl) + ' × ' + o.ax + (addLabel?(' / ADD '+addLabel):''));
+    if(bcLabel) lines.push('BC: ' + bcLabel);
+    if(warn) lines.push('<span style="color:#ff6b6b;font-weight:bold">' + warn + '</span>');
+    return lines.join('<br>');
+  }
+
+  function getMode(){ var modes=document.getElementsByName('mode'); for(var i=0;i<modes.length;i++){ if(modes[i].checked) return modes[i].value; } return 'sv'; }
+
+  function updateModeUI(){
+    var mode = getMode();
+    var mf=byId('mfOptions'); if(mf) mf.style.display = (mode==='mf') ? 'grid' : 'none';
+    var mono=byId('monoOptions'); if(mono) mono.style.display = (mode==='mono') ? 'grid' : 'none';
+    var ageWrap = byId('ageWrap'); var ageInput = byId('age'); var ageHint = byId('ageHint');
+    if(mode==='mf'){
+      if(ageWrap) ageWrap.style.display='block';
+      if(ageInput){ ageInput.disabled=false; ageInput.classList.remove('error'); }
+      if(ageHint) ageHint.style.display='none';
+    } else {
+      if(ageWrap) ageWrap.style.display='none';
+      if(ageInput){ ageInput.disabled=true; ageInput.value=''; ageInput.classList.remove('error'); }
+      if(ageHint) ageHint.style.display='none';
+    }
+  }
+
+  function calcAll(){
+    try{
+      var applyHalf = !!(byId('applyHalf') && byId('applyHalf').checked);
+      var mode = getMode();
+      var age = read('age');
+      var kMean = read('kMean');
+
+      var outFitEl = byId('outFit'); if(outFitEl){ outFitEl.textContent=''; outFitEl.style.color=''; }
+
+      // 年齢必須（mf）
+      if(mode==='mf'){
+        var ageInputEl = byId('age'); var ageHint = byId('ageHint');
+        if(!isFinite(age) || age<=0){
+          if(ageInputEl){ ageInputEl.classList.add('error'); ageInputEl.focus(); }
+          if(ageHint){ ageHint.style.display='block'; }
+          return;
+        } else {
+          if(ageInputEl){ ageInputEl.classList.remove('error'); }
+          if(ageHint){ ageHint.style.display='none'; }
+        }
+      }
+
+      var r = eyeCompute(read('rS'),read('rC'),read('rAx'),applyHalf);
+      var l = eyeCompute(read('lS'),read('lC'),read('lAx'),applyHalf);
+
+      var bc = suggestBC(kMean);
+
+      if(mode==='mono'){
+        var dms=document.getElementsByName('domMono'); var dom='R'; for(var i=0;i<dms.length;i++){ if(dms[i].checked) dom=dms[i].value; }
+        var offset=0.50; if(dom==='R'){ l.sphere = f2raw(l.sphere + offset); } else { r.sphere = f2raw(r.sphere + offset); }
+        byId('outR').innerHTML = formatCL(r, null, bc, null);
+        byId('outL').innerHTML = formatCL(l, null, bc, null);
+      } else if(mode==='mf'){
+        var des=document.getElementsByName('dom'); var dom2='none'; for(var j=0;j<des.length;j++){ if(des[j].checked) dom2=des[j].value; }
+        var adds=computeMfAdds(age, dom2);
+        var addLabelR = (adds.r!=null)? ('+'+adds.r.toFixed(2)+'D ('+adds.rLbl+')') : null;
+        var addLabelL = (adds.l!=null)? ('+'+adds.l.toFixed(2)+'D ('+adds.lLbl+')') : null;
+        // 眼ごとに警告判定（-1.25D 以下で警告、それ以外は非表示）
+        var rCraw=read('rC'), lCraw=read('lC');
+        var warnText = '⚠️ この患者は遠近両用が不適の可能性があります。';
+        var warnR = (isFinite(rCraw) && rCraw <= -1.25) ? warnText : null;
+        var warnL = (isFinite(lCraw) && lCraw <= -1.25) ? warnText : null;
+        byId('outR').innerHTML = formatCL(r, addLabelR, bc, warnR);
+        byId('outL').innerHTML = formatCL(l, addLabelL, bc, warnL);
+      } else {
+        byId('outR').innerHTML = formatCL(r, null, bc, null);
+        byId('outL').innerHTML = formatCL(l, null, bc, null);
+      }
+    }catch(e){
+      var msg='⚠️ 計算中にエラー: ' + (e && e.message ? e.message : e);
+      var box=byId('runtimeError'); if(box){ box.style.display='block'; box.textContent=msg; }
+    }
+  }
+
+  function resetAll(){
+    var ids=['rS','rC','rAx','lS','lC','lAx','age','kMean'];
+    for(var i=0;i<ids.length;i++){ var el=byId(ids[i]); if(el) el.value=''; }
+    var modes=document.getElementsByName('mode'); if(modes&&modes.length){ modes[0].checked=true; }
+    var dom=document.getElementsByName('dom'); if(dom&&dom.length){ dom[0].checked=true; }
+    var domM=document.getElementsByName('domMono'); if(domM&&domM.length){ domM[0].checked=true; }
+    var ah=byId('applyHalf'); if(ah) ah.checked=false;
+    byId('outR').innerHTML=''; byId('outL').innerHTML=''; byId('outFit').textContent='';
+    updateModeUI();
+  }
+
+  function bind(){
+    var btnCalc=byId('btnCalc'); if(btnCalc){ btnCalc.addEventListener('click', calcAll); btnCalc.onclick = calcAll; }
+    var btnReset=byId('btnReset'); if(btnReset){ btnReset.addEventListener('click', resetAll); btnReset.onclick = resetAll; }
+    var modeEls=document.getElementsByName('mode'); for(var i=0;i<modeEls.length;i++){ modeEls[i].addEventListener('change', updateModeUI); }
+    var ageEl=byId('age'); if(ageEl){ ageEl.addEventListener('input', function(){ var v=Number(ageEl.value); if(isFinite(v) && v>0){ ageEl.classList.remove('error'); var hint=byId('ageHint'); if(hint) hint.style.display='none'; } }); }
+    updateModeUI();
+    var of=byId('outFit'); if(of){ of.textContent=''; }
+  }
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', bind); }
+  else { bind(); }
+
+  // グローバル公開（onclick対策）
+  window.calcAll = calcAll; window.resetAll = resetAll;
+})();
+</script>
+</body>
+</html>
